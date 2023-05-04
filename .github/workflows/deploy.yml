@@ -1,0 +1,63 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - dev
+      - prod
+   
+
+jobs:
+  Terraform:
+    name: Terraform Plan & Apply
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+
+    - name: Checkout Repo
+      uses: actions/checkout@v2
+
+    - name: Terraform Setup
+      uses: hashicorp/setup-terraform@v1
+     
+    - name: Terraform Init
+      if: (startsWith(github.ref_name, 'dev')) 
+      #run: terraform init #this is for first trigger of workflow to create terraform configuration. comment it and uncomment below run command after first creation terraform configuration
+      run: terraform init -backend-config="bucket=amara-terraform-state" -backend-config="key=terraform.tfstate.dev" -backend-config="region=ap-south-1" -reconfigure
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TF_ACTION_WORKING_DIR: '.'
+        AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_API_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_API_SECRET_KEY }}
+
+    - name: Terraform Init
+      if: (startsWith(github.ref_name, 'prod'))
+    #  run: terraform init #this is for first trigger of workflow to create terraform configuration. comment it and uncomment below run command after first creation terraform configuration
+      run: terraform init -backend-config="amara-terraform-state" -backend-config="key=terraform.tfstate.prod" -backend-config="region=ap-south-1" -reconfigure
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TF_ACTION_WORKING_DIR: '.'
+        AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_API_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_API_SECRET_KEY }}
+
+    - name: Terraform validate
+      run: terraform validate
+
+    - name: Terraform Apply
+      if: (startsWith(github.ref_name, 'dev'))
+      run: terraform apply -auto-approve -var-file="terraform-dev.tfvars" -state=terraform.tfstate.dev 
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TF_ACTION_WORKING_DIR: '.'
+        AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_API_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_API_SECRET_KEY }}
+
+    - name: Terraform Apply
+      if: (startsWith(github.ref_name, 'prod'))
+      run: terraform apply -auto-approve -var-file="terraform-prod.tfvars" -state=terraform.tfstate.prod
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TF_ACTION_WORKING_DIR: '.'
+        AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_API_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_API_SECRET_KEY }}
+
